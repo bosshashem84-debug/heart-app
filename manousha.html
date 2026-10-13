@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>منوشة 💜</title>
+  
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#8B5CF6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="منوشة">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="icon" type="image/png" href="./icon-192.png">
+
+  <link rel="stylesheet" href="./style.css?v=9">
+</head>
+<body>
+
+  <!-- SVG Gradient Definitions -->
+  <svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
+    <linearGradient id="purple-heart-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC" />
+      <stop offset="45%" stop-color="#9333EA" />
+      <stop offset="100%" stop-color="#6B21A8" />
+    </linearGradient>
+    <linearGradient id="charge-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EC4899" />
+      <stop offset="100%" stop-color="#A855F7" />
+    </linearGradient>
+  </svg>
+
+  <div class="app-container">
+
+    <!-- NATIVE NOTIFICATION PROMPT MODAL (APPEARS ON FIRST LAUNCH / HOME SCREEN) -->
+    <div id="notifPromptModal" class="notif-prompt-modal hidden">
+      <div class="notif-modal-card">
+        <div class="notif-modal-icon">🔔</div>
+        <h2 class="notif-modal-title">تفعيل إشعارات ورنات منوشة</h2>
+        <p class="notif-modal-desc">
+          لتصلك نبضات وبوسات أصدقائك ويرن هاتفك حتى وشاشة الهاتف مقفلة، يرجى الضغط على الزر أدناه ثم اختيار <strong>"سماح" (Allow)</strong> في رسالة النظام الرسمية.
+        </p>
+        <button id="btnAllowNotifsModal" class="btn-modal-allow">
+          <span>السماح بجميع أنواع الإشعارات 🔔</span>
+        </button>
+        <button id="btnLaterNotifsModal" class="btn-modal-later">لاحقاً</button>
+      </div>
+    </div>
+
+    <!-- Floating hearts & kisses container -->
+    <div id="floatingContainer" class="floating-container"></div>
+
+    <!-- Fullscreen Giant Kiss Celebration Overlay -->
+    <div id="giantKissOverlay" class="giant-kiss-overlay hidden">
+      <div class="kiss-fx-glow"></div>
+      <div class="giant-kiss-icon">💋</div>
+      <div id="giantKissText" class="giant-kiss-title">بوسة عملاقة 💋</div>
+      <div id="giantKissSub" class="giant-kiss-sub">من @user لك 💜</div>
+      <button id="btnCloseGiantKiss" class="btn-close-kiss">إغلاق ✕</button>
+    </div>
+
+    <!-- Big overlay when regular heart is received -->
+    <div id="receivedOverlay" class="received-overlay hidden">
+      <div class="received-heart-icon">💜</div>
+      <div id="receivedSender" class="received-text">@user أرسل لك نبضة بنفسجية</div>
+    </div>
+
+    <!-- Pull to Refresh Indicator -->
+    <div id="pullRefreshIndicator" class="pull-refresh-indicator hidden">
+      <span>🔄</span>
+      <span>جاري التحديث...</span>
+    </div>
+
+    <!-- SCREEN 1: FIRST-TIME REGISTRATION ONLY -->
+    <section id="screenRegister" class="onboarding-screen hidden">
+      <div class="onboarding-logo">💜</div>
+      <h1 class="onboarding-title">منوشة</h1>
+      <p class="onboarding-desc">تطبيق النبضات البنفسجية والبوسات الفورية بين الأصدقاء</p>
+      
+      <div class="onboarding-box">
+        <input id="regInput" type="text" class="primary-input" placeholder="اكتب اسمك (مثلاً: manousha)" autocorrect="off" autocapitalize="none">
+        <div id="regError" style="color:#EF4444; font-size:0.85rem; font-weight:700;" class="hidden"></div>
+        <button id="btnSaveUser" class="btn-submit">دخول للتطبيق 💜</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: MAIN APP (DAILY USE) -->
+    <section id="screenMain" class="hidden" style="flex:1; display:flex; flex-direction:column;">
+      
+      <!-- Top Header -->
+      <header class="app-header">
+        <div class="my-user-info">
+          <span id="cloudDot" class="cloud-dot" title="متصل بالسحابة"></span>
+          <span class="app-brand-name">منوشة 💜</span>
+          <span id="displayUsername" class="user-badge">@user</span>
+        </div>
+        <div class="header-actions">
+          <button id="btnRefresh" class="icon-header-btn" title="تحديث البيانات">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            <span>تحديث</span>
+          </button>
+          <button id="btnEnableNotifs" class="icon-header-btn" title="تفعيل الإشعارات عند قفل الشاشة">
+            <span>🔔</span>
+          </button>
+          <button id="btnResetAccount" class="icon-header-btn" title="تغيير اليوزر">
+            <span>⚙️</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Lock Screen Notification Tip Banner (Expandable/Dismissible) -->
+      <div id="lockscreenBanner" class="lockscreen-banner">
+        <div class="lockscreen-content">
+          <div class="lockscreen-text">
+            <strong>🔔 لتصلك الإشعارات وشاشة هاتفك مقفلة:</strong>
+            <span>أضف التطبيق للشاشة الرئيسية (زر المشاركة ⎋ ثم إضافة للشاشة الرئيسية) وفعّل الإشعارات.</span>
+          </div>
+          <button id="btnDismissLockscreenBanner" class="btn-dismiss-banner">فهمت ✓</button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs (3 Tabs) -->
+      <nav class="nav-tabs">
+        <button id="tabHeart" class="tab-btn active">
+          <span>💜</span>
+          <span>القلب</span>
+        </button>
+        <button id="tabFriends" class="tab-btn">
+          <span>👥</span>
+          <span>الأصدقاء</span>
+          <span id="tabBadge" class="badge-dot hidden"></span>
+        </button>
+        <button id="tabKisses" class="tab-btn">
+          <span>💋</span>
+          <span>البوسات</span>
+          <span id="tabKissBadge" class="badge-dot hidden"></span>
+        </button>
+      </nav>
+
+      <!-- TAB 1: HEART SCREEN -->
+      <div id="viewHeart" class="tab-view" style="flex:1; display:flex; flex-direction:column;">
+        <!-- PROMINENT INCOMING REQUEST BANNER -->
+        <div id="incomingBanner" class="incoming-alert-banner hidden">
+          <div class="alert-info">
+            <span id="bannerTitle" class="alert-title">👋 طلب إضافة جديد</span>
+            <span id="bannerSub" class="alert-sub">@user يريد إضافتك في منوشة</span>
+          </div>
+          <div class="alert-actions">
+            <button id="btnAcceptReq" class="btn-accept">قبول ✓</button>
+            <button id="btnDeclineReq" class="btn-decline">✕</button>
+          </div>
+        </div>
+
+        <!-- Add Friend Box -->
+        <div class="add-friend-box">
+          <input id="inputFriendName" type="text" class="add-input" placeholder="ابحث بالحرف (مثلاً: m) أو اكتب اليوزر" autocorrect="off" autocapitalize="none">
+          <button id="btnAddFriend" class="btn-add-action">إضافة +</button>
+        </div>
+        <!-- Autocomplete Suggestions Dropdown -->
+        <div id="suggestionsBox" class="suggestions-box hidden"></div>
+        <div id="addFeedback" class="add-feedback hidden"></div>
+
+        <!-- Current Friend Pill -->
+        <div id="friendPill" class="active-friend-pill hidden">
+          <span>صديقك:</span>
+          <strong id="friendPillName">@friend</strong>
+          <span>💜</span>
+        </div>
+
+        <!-- Stats Counters -->
+        <div class="stats-row">
+          <div class="stat-item">أرسلت: <span id="statSent">0</span></div>
+          <div class="stat-item">•</div>
+          <div class="stat-item">استلمت: <span id="statReceived">0</span></div>
+          <div class="stat-item">•</div>
+          <div class="stat-item">بوسات: <span id="statKisses">0</span> 💋</div>
+        </div>
+
+        <!-- Big Purple Heart Button with 3-Second Long Press Charging Ring -->
+        <div class="heart-stage">
+          <div class="heart-ring-wrapper">
+            <svg class="charge-svg" viewBox="0 0 260 260">
+              <circle class="charge-bg-circle" cx="130" cy="130" r="118" />
+              <circle id="chargeProgressCircle" class="charge-bar-circle" cx="130" cy="130" r="118" />
+            </svg>
+            <button id="heartBtn" class="main-heart-btn" aria-label="أرسل قلب أو بوسة">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Prompt Text -->
+        <div id="heartPromptText" class="heart-prompt-text">
+          اضغط لنبضة بنفسجية 💜 • علّق 3 ثواني لبوسة عملاقة 💋
+        </div>
+      </div>
+
+      <!-- TAB 2: FRIENDS LIST PAGE -->
+      <div id="viewFriends" class="tab-view friends-page hidden">
+        <!-- Incoming Requests Section -->
+        <div id="sectionRequests" class="section-card hidden">
+          <div class="section-heading">
+            <span>طلبات الإضافة الواردة</span>
+            <span style="color:var(--primary)">🔔</span>
+          </div>
+          <div id="requestsList"></div>
+        </div>
+
+        <!-- My Friends Section -->
+        <div class="section-card">
+          <div class="section-heading">
+            <span>الأصدقاء المضافون</span>
+            <span id="friendsCountBadge" class="counter-badge">0</span>
+          </div>
+          <div id="friendsList"></div>
+          <div id="emptyFriendsMsg" class="empty-state">
+            لا يوجد أصدقاء مضافون بعد.<br>
+            اكتب يوزر صديقك في خانة الإضافة بالأعلى أو شارك رابطك معه!
+          </div>
+        </div>
+
+        <!-- Share My Link Section -->
+        <div class="section-card" style="text-align:center; padding:18px;">
+          <div style="font-size:0.9rem; font-weight:700; margin-bottom:4px;">يوزرك في منوشة: <strong id="shareUnameText" style="color:var(--primary)">@user</strong></div>
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px;">أرسل الرابط لأصحابك ليضيفوك فوراً ويبادلوك القلوب والبوسات</p>
+          <button id="btnShareMyLink" class="btn-action-primary" style="width:100%; padding:12px;">
+            <span>مشاركة الرابط واليوزر</span>
+            <span>🔗</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 3: KISSES PAGE (بوسات منوشة والصوت) -->
+      <div id="viewKisses" class="tab-view kisses-page hidden">
+        
+        <!-- Direct Kiss Card -->
+        <div class="section-card kiss-card-highlight">
+          <div class="section-heading">
+            <span>إرسال بوسة سريعة 💋</span>
+            <button id="btnQuickKissSound" class="btn-sound-preview" title="تجربة صوت البوسة">🔊 استماع للصوت</button>
+          </div>
+          <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:12px;">
+            أرسل بوسة عملاقة لصديقك بصوت بوسة ورنة فورية على جهازه
+          </p>
+          <button id="btnSendDirectKiss" class="btn-action-kiss">
+            <span>أرسل بوسة عملاقة الآن 💋</span>
+          </button>
+        </div>
+
+        <!-- Custom Voice Kiss Recorder -->
+        <div class="section-card">
+          <div class="section-heading">
+            <span>سجّل بوسة بصوتك 🎙️</span>
+            <span style="font-size:0.8rem; color:var(--primary); font-weight:700;">جديد!</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px;">
+            سجّل صوتك وأنت ترسل بوسة حقيقية (حتى 3 ثواني) لتصل لصديقك ويستمع لصوتك الحقيقي!
+          </p>
+          
+          <div class="voice-recorder-box">
+            <div id="recordStatusText" class="record-status-text">جاهز للتسجيل 🎙️</div>
+            <div class="recorder-controls">
+              <button id="btnStartRecord" class="btn-record">
+                <span class="rec-dot"></span>
+                <span>تسجيل صوتك</span>
+              </button>
+              <button id="btnPlayMyVoice" class="btn-play-voice hidden">
+                <span>استماع ▶️</span>
+              </button>
+            </div>
+            <div id="voiceSendSection" class="hidden" style="margin-top:10px;">
+              <button id="btnSendVoiceKiss" class="btn-action-primary" style="width:100%;">
+                <span>إرسال البوسة بصوتك لصديقك 🚀</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kisses Inbox / Log -->
+        <div class="section-card">
+          <div class="section-heading">
+            <span>صندوق البوسات المستلمة 📬</span>
+            <span id="kissesCountBadge" class="counter-badge">0</span>
+          </div>
+          <div id="kissesInboxList"></div>
+          <div id="emptyKissesMsg" class="empty-state">
+            لم تستلم أي بوسات بعد.<br>
+            ستظهر كل البوسات المستلمة هنا لتستمع لأصواتها في أي وقت!
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </div>
+
+  <script src="./app.js?v=9"></script>
+</body>
+</html>
