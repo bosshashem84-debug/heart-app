@@ -148,8 +148,8 @@ body {
 .friends-bar-wrapper {
   overflow-x: auto;
   white-space: nowrap;
-  padding: 6px 2px 10px;
-  margin-bottom: 10px;
+  padding: 6px 2px 8px;
+  margin-bottom: 6px;
   scrollbar-width: none;
 }
 
@@ -185,6 +185,62 @@ body {
 
 .friend-pill:active {
   transform: scale(0.94);
+}
+
+/* Heart Stats Bar */
+.stats-bar {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 4px 0 10px;
+}
+
+.stat-chip {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 8px 14px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+  border: 1px solid rgba(255, 45, 85, 0.08);
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+/* Cloud Connection Dot */
+.cloud-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34C759;
+  display: inline-block;
+  box-shadow: 0 0 6px #34C759;
+  margin-right: 4px;
+  transition: background 0.3s;
+}
+
+.cloud-dot.connecting {
+  background: #FF9500;
+  box-shadow: 0 0 6px #FF9500;
+}
+
+.cloud-dot.disconnected {
+  background: #FF3B30;
+  box-shadow: 0 0 6px #FF3B30;
 }
 
 /* Main Heart Area */
