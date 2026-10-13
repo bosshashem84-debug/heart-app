@@ -1,4 +1,6 @@
-// تطبيق القلب ❤️ - Web Cloud Real-Time Engine (PWA)
+// تطبيق القلب ❤️ - Web Cloud Real-Time Engine (Ultra-Reliable HTTPS & SSE)
+
+const CLOUD_PREFIX = 'heartapp_v1_live_';
 
 class SoundEffects {
   constructor() {
@@ -13,35 +15,39 @@ class SoundEffects {
   playSend() {
     this.init();
     if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(160, now);
-    osc.frequency.exponentialRampToValueAtTime(70, now + 0.15);
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.15);
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.15);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } catch (e) {}
   }
   playReceive() {
     this.init();
     if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    [440, 660, 880].forEach((freq, i) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now + i * 0.08);
-      gain.gain.setValueAtTime(0.3, now + i * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.25);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now + i * 0.08);
-      osc.stop(now + i * 0.08 + 0.25);
-    });
+    try {
+      const now = this.ctx.currentTime;
+      [440, 660, 880].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.08);
+        gain.gain.setValueAtTime(0.3, now + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now + i * 0.08);
+        osc.stop(now + i * 0.08 + 0.25);
+      });
+    } catch (e) {}
   }
 }
 
@@ -54,12 +60,13 @@ class Store {
     this.friends = JSON.parse(localStorage.getItem('ha_friends') || '[]');
     this.requests = JSON.parse(localStorage.getItem('ha_requests') || '[]');
     this.stats = JSON.parse(localStorage.getItem('ha_stats') || '{"sent": 0, "received": 0, "total": 0}');
+    this.processedMsgIds = new Set(JSON.parse(localStorage.getItem('ha_processed_ids') || '[]'));
     this.selected = new Set();
     this.receivedTimeout = null;
-    this.mqttClient = null;
-    this.cloudConnected = false;
+    this.eventSource = null;
+    this.pollInterval = null;
 
-    // Cross-tab fallback bus
+    // Cross-tab local bus
     this.bus = new BroadcastChannel('heart_app_local_bus');
     this.bus.onmessage = (e) => this.handleIncomingMessage(e.data);
 
@@ -76,57 +83,101 @@ class Store {
     localStorage.setItem('ha_friends', JSON.stringify(this.friends));
     localStorage.setItem('ha_requests', JSON.stringify(this.requests));
     localStorage.setItem('ha_stats', JSON.stringify(this.stats));
+
+    // Keep last 50 processed message IDs
+    const idArr = Array.from(this.processedMsgIds).slice(-50);
+    localStorage.setItem('ha_processed_ids', JSON.stringify(idArr));
+  }
+
+  getTopicForUser(uname) {
+    return CLOUD_PREFIX + uname.toLowerCase().replace(/[^a-z0-9_]/g, '');
   }
 
   initCloud() {
-    if (typeof mqtt === 'undefined') return;
+    if (!this.username) {
+      this.setCloudStatus('connecting');
+      return;
+    }
 
-    const clientId = 'ha_' + Math.random().toString(16).substring(2, 10);
-    // Public secure MQTT over WebSocket brokers (SSL 8084)
-    const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+    this.connectCloudStream();
+    this.pollRecentMessages();
+
+    // Auto poll every 15 seconds to ensure background delivery on mobile
+    if (this.pollInterval) clearInterval(this.pollInterval);
+    this.pollInterval = setInterval(() => {
+      this.pollRecentMessages();
+    }, 15000);
+  }
+
+  connectCloudStream() {
+    if (!this.username) return;
+    const topic = this.getTopicForUser(this.username);
+
+    if (this.eventSource) {
+      this.eventSource.close();
+    }
 
     this.setCloudStatus('connecting');
 
     try {
-      this.mqttClient = mqtt.connect(brokerUrl, {
-        clientId,
-        clean: true,
-        connectTimeout: 8000,
-        reconnectPeriod: 3000
-      });
+      this.eventSource = new EventSource(`https://ntfy.sh/${topic}/sse`);
 
-      this.mqttClient.on('connect', () => {
-        this.cloudConnected = true;
+      this.eventSource.onopen = () => {
         this.setCloudStatus('connected');
-        if (this.username) {
-          this.subscribeToUserTopic(this.username);
-        }
-      });
+      };
 
-      this.mqttClient.on('reconnect', () => {
-        this.setCloudStatus('connecting');
-      });
-
-      this.mqttClient.on('offline', () => {
-        this.cloudConnected = false;
-        this.setCloudStatus('disconnected');
-      });
-
-      this.mqttClient.on('error', (err) => {
-        console.log('Cloud note:', err);
-        this.setCloudStatus('connecting');
-      });
-
-      this.mqttClient.on('message', (topic, payload) => {
+      this.eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(payload.toString());
-          this.handleIncomingMessage(data);
+          const msgObj = JSON.parse(event.data);
+          if (msgObj.event === 'message') {
+            if (msgObj.id && this.processedMsgIds.has(msgObj.id)) return;
+            if (msgObj.id) this.processedMsgIds.add(msgObj.id);
+
+            const payload = JSON.parse(msgObj.message);
+            this.handleIncomingMessage(payload);
+          }
         } catch (e) {
-          console.error('Invalid payload:', e);
+          console.error('SSE parse error:', e);
         }
-      });
+      };
+
+      this.eventSource.onerror = () => {
+        this.setCloudStatus('connecting');
+      };
     } catch (e) {
-      console.log('MQTT init:', e);
+      console.log('EventSource note:', e);
+      this.setCloudStatus('connecting');
+    }
+  }
+
+  async pollRecentMessages() {
+    if (!this.username) return;
+    const topic = this.getTopicForUser(this.username);
+
+    try {
+      // Fetch messages sent in the last 12 hours
+      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=12h`);
+      if (!res.ok) return;
+
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msgObj = JSON.parse(line);
+          if (msgObj.event === 'message') {
+            if (msgObj.id && this.processedMsgIds.has(msgObj.id)) continue;
+            if (msgObj.id) this.processedMsgIds.add(msgObj.id);
+
+            const payload = JSON.parse(msgObj.message);
+            this.handleIncomingMessage(payload);
+          }
+        } catch (e) {}
+      }
+      this.save();
+    } catch (e) {
+      console.log('Poll error:', e);
     }
   }
 
@@ -134,27 +185,33 @@ class Store {
     const dot = document.getElementById('cloudStatusDot');
     if (!dot) return;
     dot.className = `cloud-dot ${status}`;
-    if (status === 'connected') dot.title = 'متصل بالسحابة الحية 🟢 (يعمل بين كل الهواتف)';
+    if (status === 'connected') dot.title = 'متصل بالسحابة الحية 🟢 (يعمل بين كل الهواتف عبر الإنترنت)';
     else if (status === 'connecting') dot.title = 'جاري الاتصال بالسحابة 🟡';
     else dot.title = 'غير متصل بالسحابة 🔴';
   }
 
-  subscribeToUserTopic(uname) {
-    if (!this.mqttClient || !this.cloudConnected) return;
-    const topic = `heartapp_v1/inbox/${uname.toLowerCase()}`;
-    this.mqttClient.subscribe(topic, { qos: 1 });
-  }
+  async publishCloud(targetUsername, payload) {
+    const topic = this.getTopicForUser(targetUsername);
 
-  publishCloud(targetUsername, payload) {
-    const topic = `heartapp_v1/inbox/${targetUsername.toLowerCase()}`;
-    const jsonStr = JSON.stringify(payload);
-
-    // Send through Cloud MQTT
-    if (this.mqttClient && this.cloudConnected) {
-      this.mqttClient.publish(topic, jsonStr, { qos: 1 });
+    // 1. Send via HTTPS to ntfy.sh (Port 443 - works everywhere)
+    try {
+      await fetch(`https://ntfy.sh/${topic}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Title': payload.type === 'HEART' ? '❤️ نبضة قلب جديدة' : '👋 طلب صداقة جديد',
+          'Priority': 'urgent'
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.error('Publish cloud error:', e);
     }
-    // Also broadcast to local bus (same device fallback)
-    this.bus.postMessage(payload);
+
+    // 2. Also send to local broadcast bus (same-device fallback)
+    try {
+      this.bus.postMessage(payload);
+    } catch (e) {}
   }
 
   start() {
@@ -172,32 +229,28 @@ class Store {
 
     this.username = name;
     this.save();
-
-    if (this.cloudConnected) {
-      this.subscribeToUserTopic(name);
-    }
+    this.initCloud();
 
     return { ok: true };
   }
 
-  sendRequest(raw) {
+  async sendRequest(raw) {
     const target = raw.toLowerCase().trim().replace(/^@/, '');
     if (!target) return { ok: false, message: 'اكتب اسم المستخدم' };
-    if (target === this.username) return { ok: false, message: 'ما تقدر تضيف نفسك 😅' };
+    if (target === this.username.toLowerCase()) return { ok: false, message: 'ما تقدر تضيف نفسك 😅' };
 
     if (this.friends.some(f => f.username.toLowerCase() === target)) {
       return { ok: false, message: `@${target} صديقك أصلاً ❤️` };
     }
 
-    // Check if they already sent a request to me
     const existingReq = this.requests.find(r => r.username.toLowerCase() === target);
     if (existingReq) {
-      this.acceptRequest(existingReq);
+      await this.acceptRequest(existingReq);
       return { ok: true, message: `صرت صديق @${target} 🎉` };
     }
 
     // Send Request through Cloud
-    this.publishCloud(target, {
+    await this.publishCloud(target, {
       type: 'FRIEND_REQUEST',
       from: this.username,
       fromUid: this.uid,
@@ -207,7 +260,7 @@ class Store {
     return { ok: true, message: `انرسل الطلب لـ @${target} عبر السحابة ✅` };
   }
 
-  acceptRequest(req) {
+  async acceptRequest(req) {
     if (!this.friends.some(f => f.username.toLowerCase() === req.username.toLowerCase())) {
       this.friends.push({ id: req.id || req.username, username: req.username });
       this.friends.sort((a, b) => a.username.localeCompare(b.username));
@@ -215,8 +268,8 @@ class Store {
     this.requests = this.requests.filter(r => r.username.toLowerCase() !== req.username.toLowerCase());
     this.save();
 
-    // Notify the other user via Cloud
-    this.publishCloud(req.username, {
+    // Notify other user via Cloud
+    await this.publishCloud(req.username, {
       type: 'FRIEND_ACCEPTED',
       from: this.username,
       fromUid: this.uid,
@@ -238,7 +291,7 @@ class Store {
     renderUI();
   }
 
-  sendHeart() {
+  async sendHeart() {
     if (this.friends.length === 0) return;
     sounds.playSend();
     if (navigator.vibrate) navigator.vibrate(60);
@@ -247,32 +300,28 @@ class Store {
       ? this.friends.map(f => f.username)
       : Array.from(this.selected);
 
-    // Increment my sent counter
     this.stats.sent += targets.length;
     this.stats.total += targets.length;
     this.save();
     updateStatsDisplay();
 
-    // Transmit heart to each target via Cloud
-    targets.forEach(targetName => {
-      this.publishCloud(targetName, {
+    for (const targetName of targets) {
+      await this.publishCloud(targetName, {
         type: 'HEART',
         from: this.username,
         fromUid: this.uid,
         target: targetName,
         timestamp: Date.now()
       });
-    });
+    }
   }
 
   handleIncomingMessage(data) {
     if (!data || !this.username) return;
 
-    // Filter only messages addressed to me
     if (data.target && data.target.toLowerCase() !== this.username.toLowerCase()) {
       return;
     }
-    // Prevent self-loop
     if (data.from && data.from.toLowerCase() === this.username.toLowerCase()) {
       return;
     }
@@ -290,6 +339,11 @@ class Store {
         this.requests.push({ id: data.fromUid || data.from, username: data.from });
         this.save();
         renderUI();
+        sounds.playReceive();
+
+        // Show friendly alert/toast
+        showToast(`وصلك طلب صداقة من @${data.from} 👋`);
+
         if (Notification.permission === 'granted') {
           new Notification('طلب صداقة جديد 👋', { body: `@${data.from} يريد إضافتك في تطبيق القلب` });
         }
@@ -300,6 +354,10 @@ class Store {
         this.friends.sort((a, b) => a.username.localeCompare(b.username));
         this.save();
         renderUI();
+        sounds.playReceive();
+
+        showToast(`@${data.from} قبل طلب الصداقة 🎉`);
+
         if (Notification.permission === 'granted') {
           new Notification('تم قبول الصداقة 🎉', { body: `@${data.from} قبل طلبك وأصبح صديقك الآن!` });
         }
@@ -329,6 +387,8 @@ class Store {
   }
 
   signOut() {
+    if (this.eventSource) this.eventSource.close();
+    if (this.pollInterval) clearInterval(this.pollInterval);
     this.uid = null;
     this.username = null;
     this.friends = [];
@@ -339,6 +399,8 @@ class Store {
   }
 
   deleteAccount() {
+    if (this.eventSource) this.eventSource.close();
+    if (this.pollInterval) clearInterval(this.pollInterval);
     localStorage.clear();
     this.uid = null;
     this.username = null;
@@ -351,6 +413,36 @@ class Store {
 }
 
 const store = new Store();
+
+function showToast(msg) {
+  let toast = document.getElementById('appToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'appToast';
+    toast.style.cssText = `
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1C1C1E;
+      color: #FFF;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      z-index: 999;
+      animation: popIn 0.3s ease;
+      white-space: nowrap;
+    `;
+    document.querySelector('.app-container').appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 3500);
+}
 
 function spawnFloatingHeart() {
   const container = document.getElementById('floatingContainer');
@@ -520,8 +612,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const btnSendRequest = document.getElementById('btnSendRequest');
   const addFriendStatus = document.getElementById('addFriendStatus');
 
-  btnSendRequest.onclick = () => {
-    const res = store.sendRequest(addFriendInput.value);
+  btnSendRequest.onclick = async () => {
+    btnSendRequest.disabled = true;
+    btnSendRequest.textContent = 'جاري الإرسال...';
+    const res = await store.sendRequest(addFriendInput.value);
+    btnSendRequest.disabled = false;
+    btnSendRequest.textContent = 'إرسال';
     addFriendStatus.textContent = res.message;
     addFriendStatus.className = `status-msg ${res.ok ? 'success' : 'error'}`;
     addFriendStatus.classList.remove('hidden');
@@ -552,6 +648,13 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Re-poll on window focus or visibility change (when user returns to app)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      store.pollRecentMessages();
+    }
+  });
+
   if ('Notification' in window && Notification.permission === 'default') {
     setTimeout(() => {
       Notification.requestPermission();
@@ -561,6 +664,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function openFriendsModal() {
   document.getElementById('friendsModalBackdrop').classList.add('active');
+  store.pollRecentMessages(); // Refresh requests when modal opens
 }
 function closeFriendsModal() {
   document.getElementById('friendsModalBackdrop').classList.remove('active');
