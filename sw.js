@@ -1,4 +1,4 @@
-const CACHE_NAME = 'heart-app-v7';
+const CACHE_NAME = 'manousha-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -20,13 +20,13 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.map((key) => caches.delete(key)) // Delete all old caches
+        keys.map((key) => caches.delete(key))
       );
     }).then(() => self.clients.claim())
   );
 });
 
-// NETWORK-FIRST STRATEGY (Ensures users always get the latest update immediately)
+// Network-First Strategy
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
@@ -45,23 +45,47 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Handle Background Push Notifications
 self.addEventListener('push', (event) => {
-  let data = { title: '❤️ قلب جديد!', body: 'وصلك قلب من أحد أصدقائك' };
+  let data = { title: 'منوشة 💜', body: 'وصلتك نبضة جديدة في تطبيق منوشة!' };
   try {
-    if (event.data) data = event.data.json();
+    if (event.data) {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    }
   } catch (e) {
     if (event.data) data.body = event.data.text();
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
+    self.registration.showNotification(data.title || 'منوشة 💜', {
+      body: data.body || data.message || 'نبضة قلب جديدة 💜',
       icon: './icon-192.png',
       badge: './icon-192.png',
-      vibrate: [200, 100, 200],
-      tag: 'heart-notif'
+      vibrate: [200, 100, 200, 100, 400],
+      tag: 'manousha-alert',
+      renotify: true,
+      data: { url: './index.html' }
     })
   );
+});
+
+// Handle Direct PostMessage from Page to Service Worker for Background Notification
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const { title, body, tag } = event.data;
+    event.waitUntil(
+      self.registration.showNotification(title || 'منوشة 💜', {
+        body: body || 'نبضة قلب جديدة 💜',
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        vibrate: [200, 100, 200, 100, 400],
+        tag: tag || 'manousha-alert',
+        renotify: true,
+        data: { url: './index.html' }
+      })
+    );
+  }
 });
 
 self.addEventListener('notificationclick', (event) => {
@@ -71,7 +95,7 @@ self.addEventListener('notificationclick', (event) => {
       for (const client of clientList) {
         if ('focus' in client) return client.focus();
       }
-      if (clients.openWindow) return clients.openWindow('./');
+      if (clients.openWindow) return clients.openWindow('./index.html');
     })
   );
 });
