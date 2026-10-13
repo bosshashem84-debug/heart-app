@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="icon" type="image/png" href="./icon-192.png">
 
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=6">
 </head>
 <body>
 
@@ -105,9 +105,11 @@
 
         <!-- Add Friend Box -->
         <div class="add-friend-box">
-          <input id="inputFriendName" type="text" class="add-input" placeholder="اكتب يوزر صديقك لإضافته" autocorrect="off" autocapitalize="none">
+          <input id="inputFriendName" type="text" class="add-input" placeholder="ابحث بالحرف (مثلاً: m) أو اكتب اليوزر" autocorrect="off" autocapitalize="none">
           <button id="btnAddFriend" class="btn-add-action">إضافة +</button>
         </div>
+        <!-- Autocomplete Suggestions Dropdown -->
+        <div id="suggestionsBox" class="suggestions-box hidden"></div>
         <div id="addFeedback" class="add-feedback hidden"></div>
 
         <!-- Current Friend Pill -->
@@ -177,6 +179,6 @@
 
   </div>
 
-  <script src="./app.js"></script>
+  <script src="./app.js?v=6"></script>
 </body>
 </html>
