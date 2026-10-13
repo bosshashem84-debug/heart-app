@@ -1,7 +1,8 @@
-const CACHE_NAME = 'manousha-v8';
+const CACHE_NAME = 'manousha-v9-live';
 const ASSETS = [
   './',
   './index.html',
+  './manousha.html',
   './style.css',
   './app.js',
   './manifest.json',
@@ -40,7 +41,7 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(() => {
-        return caches.match(event.request).then((cached) => cached || caches.match('./index.html'));
+        return caches.match(event.request).then((cached) => cached || caches.match('./manousha.html') || caches.match('./index.html'));
       })
   );
 });
@@ -62,10 +63,11 @@ self.addEventListener('push', (event) => {
       body: data.body || data.message || 'نبضة قلب جديدة 💜',
       icon: './icon-192.png',
       badge: './icon-192.png',
-      vibrate: [200, 100, 200, 100, 400],
+      vibrate: [300, 150, 300, 150, 500],
       tag: 'manousha-alert',
       renotify: true,
-      data: { url: './index.html' }
+      requireInteraction: true,
+      data: { url: './manousha.html' }
     })
   );
 });
@@ -79,10 +81,11 @@ self.addEventListener('message', (event) => {
         body: body || 'نبضة قلب جديدة 💜',
         icon: './icon-192.png',
         badge: './icon-192.png',
-        vibrate: [200, 100, 200, 100, 400],
+        vibrate: [300, 150, 300, 150, 500],
         tag: tag || 'manousha-alert',
         renotify: true,
-        data: { url: './index.html' }
+        requireInteraction: true,
+        data: { url: './manousha.html' }
       })
     );
   }
@@ -93,9 +96,11 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ('focus' in client) return client.focus();
+        if (client.url.includes('manousha') || client.url.includes('index')) {
+          if ('focus' in client) return client.focus();
+        }
       }
-      if (clients.openWindow) return clients.openWindow('./index.html');
+      if (clients.openWindow) return clients.openWindow('./manousha.html');
     })
   );
 });
