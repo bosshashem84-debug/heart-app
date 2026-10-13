@@ -1,6 +1,7 @@
-// تطبيق القلب ❤️ - مع صفحة الأصدقاء وقائمة الإضافات
+// تطبيق القلب ❤️ - مع محرك البحث الذكي (Autocomplete) والتحديث الفوري
 
 const CLOUD_PREFIX = 'heartapp_v2_';
+const DIRECTORY_TOPIC = 'heartapp_v2_global_directory';
 
 // Audio
 class SoundFX {
@@ -65,15 +66,16 @@ const state = {
   username: localStorage.getItem('ha_uname') || getCookie('ha_uname') || null,
   friends: JSON.parse(localStorage.getItem('ha_friends_list') || '[]'),
   requests: JSON.parse(localStorage.getItem('ha_reqs_list') || '[]'),
+  knownUsers: new Set(JSON.parse(localStorage.getItem('ha_known_users') || '["mohammed", "mariam", "mahmoud", "majdi", "muna", "ahmed", "sara", "fahad", "khalid"]')),
   sent: parseInt(localStorage.getItem('ha_sent') || '0', 10),
   received: parseInt(localStorage.getItem('ha_rcvd') || '0', 10),
   processedIds: new Set(JSON.parse(localStorage.getItem('ha_msg_ids') || '[]')),
-  currentTab: 'heart', // 'heart' | 'friends'
+  currentTab: 'heart',
   eventSource: null,
   pollTimer: null
 };
 
-// Migrate single friend if exists
+// Migrate old single friend if exists
 const oldSingleFriend = localStorage.getItem('ha_friend') || getCookie('ha_friend');
 if (oldSingleFriend && !state.friends.includes(oldSingleFriend)) {
   state.friends.push(oldSingleFriend);
@@ -83,6 +85,7 @@ function saveState() {
   if (state.username) {
     localStorage.setItem('ha_uname', state.username);
     setCookie('ha_uname', state.username);
+    state.knownUsers.add(state.username);
   } else {
     localStorage.removeItem('ha_uname');
     setCookie('ha_uname', '');
@@ -90,6 +93,7 @@ function saveState() {
 
   localStorage.setItem('ha_friends_list', JSON.stringify(state.friends));
   localStorage.setItem('ha_reqs_list', JSON.stringify(state.requests));
+  localStorage.setItem('ha_known_users', JSON.stringify(Array.from(state.knownUsers)));
   localStorage.setItem('ha_sent', state.sent);
   localStorage.setItem('ha_rcvd', state.received);
 
@@ -132,8 +136,14 @@ function initCloud() {
   } catch (err) {}
 
   pollCloud();
+  announceToDirectory();
+  pollDirectory();
+
   if (state.pollTimer) clearInterval(state.pollTimer);
-  state.pollTimer = setInterval(pollCloud, 10000);
+  state.pollTimer = setInterval(() => {
+    pollCloud();
+    pollDirectory();
+  }, 10000);
 }
 
 async function pollCloud() {
@@ -159,6 +169,40 @@ async function pollCloud() {
   } catch (err) {}
 }
 
+// Directory Autocomplete Engine
+async function announceToDirectory() {
+  if (!state.username) return;
+  try {
+    await fetch(`https://ntfy.sh/${DIRECTORY_TOPIC}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: state.username })
+    });
+  } catch (e) {}
+}
+
+async function pollDirectory() {
+  try {
+    const res = await fetch(`https://ntfy.sh/${DIRECTORY_TOPIC}/json?poll=1&since=48h`);
+    if (!res.ok) return;
+    const txt = await res.text();
+    const lines = txt.trim().split('\n');
+    for (const l of lines) {
+      if (!l.trim()) continue;
+      try {
+        const msg = JSON.parse(l);
+        if (msg.event === 'message') {
+          const payload = JSON.parse(msg.message);
+          if (payload.user && typeof payload.user === 'string') {
+            state.knownUsers.add(payload.user.toLowerCase().trim());
+          }
+        }
+      } catch (e) {}
+    }
+    saveState();
+  } catch (e) {}
+}
+
 async function publishCloud(targetUname, payload) {
   const topic = getTopic(targetUname);
   try {
@@ -180,7 +224,7 @@ function handleCloudMessage(data) {
 
   if (data.type === 'ADD_REQUEST') {
     const fromWho = data.from.toLowerCase();
-    // Check if not already in friends or requests
+    state.knownUsers.add(fromWho);
     if (!state.friends.includes(fromWho) && !state.requests.includes(fromWho)) {
       state.requests.push(fromWho);
       saveState();
@@ -188,7 +232,6 @@ function handleCloudMessage(data) {
       sounds.receive();
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
-      // Show top banner on heart tab
       showIncomingBanner(fromWho);
 
       if (Notification.permission === 'granted') {
@@ -197,6 +240,7 @@ function handleCloudMessage(data) {
     }
   } else if (data.type === 'ADD_ACCEPTED') {
     const fromWho = data.from.toLowerCase();
+    state.knownUsers.add(fromWho);
     if (!state.friends.includes(fromWho)) {
       state.friends.push(fromWho);
       saveState();
@@ -270,7 +314,7 @@ function showFeedback(msg, type) {
   }
 }
 
-// Accept & Decline actions
+// Accept / Decline / Remove
 async function acceptUser(uname) {
   const target = uname.toLowerCase();
   state.requests = state.requests.filter(r => r !== target);
@@ -322,8 +366,34 @@ async function sendHeartToUser(targetUname) {
     timestamp: Date.now()
   });
 
-  // Switch to heart tab
   switchTab('heart');
+}
+
+async function sendFriendRequest(target) {
+  const cleanTarget = target.trim().toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '');
+  if (!cleanTarget) {
+    showFeedback('اكتب اسم صديقك', 'error');
+    return;
+  }
+  if (cleanTarget === state.username.toLowerCase()) {
+    showFeedback('ما تقدر تضيف نفسك 😅', 'error');
+    return;
+  }
+
+  if (!state.friends.includes(cleanTarget)) {
+    state.friends.push(cleanTarget);
+  }
+  state.knownUsers.add(cleanTarget);
+  saveState();
+  updateUI();
+
+  await publishCloud(cleanTarget, {
+    type: 'ADD_REQUEST',
+    from: state.username,
+    target: cleanTarget
+  });
+
+  showFeedback(`تم إرسال طلب إضافة لـ @${cleanTarget} بنجاح ✅`, 'success');
 }
 
 // Switch Tabs
@@ -454,7 +524,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tabHeart').onclick = () => switchTab('heart');
   document.getElementById('tabFriends').onclick = () => {
     switchTab('friends');
-    pollCloud(); // refresh when opening friends page
+    pollCloud();
   };
 
   // Register First-Time
@@ -476,34 +546,60 @@ window.addEventListener('DOMContentLoaded', () => {
     initCloud();
   };
 
-  // Add Friend Input
-  document.getElementById('btnAddFriend').onclick = async () => {
-    const input = document.getElementById('inputFriendName');
-    const target = input.value.trim().toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '');
+  // Add Friend Input & Suggestions
+  const inputFriend = document.getElementById('inputFriendName');
+  const sugBox = document.getElementById('suggestionsBox');
 
-    if (!target) {
-      showFeedback('اكتب اسم صديقك', 'error');
+  // Autocomplete typing listener
+  inputFriend.addEventListener('input', () => {
+    const val = inputFriend.value.trim().toLowerCase().replace(/^@/, '');
+    if (!val) {
+      sugBox.classList.add('hidden');
       return;
     }
-    if (target === state.username.toLowerCase()) {
-      showFeedback('ما تقدر تضيف نفسك 😅', 'error');
+
+    const matches = Array.from(state.knownUsers)
+      .filter(u => u.toLowerCase().startsWith(val) && u.toLowerCase() !== state.username.toLowerCase())
+      .slice(0, 6);
+
+    if (matches.length === 0) {
+      sugBox.classList.add('hidden');
       return;
     }
 
-    if (!state.friends.includes(target)) {
-      state.friends.push(target);
-    }
-    saveState();
-    updateUI();
-    input.value = '';
-
-    await publishCloud(target, {
-      type: 'ADD_REQUEST',
-      from: state.username,
-      target
+    sugBox.innerHTML = '';
+    matches.forEach(name => {
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.innerHTML = `
+        <span class="suggestion-name">
+          <span style="color:#FF2D55">❤️</span>
+          <span>@${name}</span>
+        </span>
+        <button class="btn-suggest-add">إضافة +</button>
+      `;
+      item.onclick = (e) => {
+        e.stopPropagation();
+        inputFriend.value = name;
+        sugBox.classList.add('hidden');
+        sendFriendRequest(name);
+      };
+      sugBox.appendChild(item);
     });
+    sugBox.classList.remove('hidden');
+  });
 
-    showFeedback(`تم إرسال طلب إضافة لـ @${target} بنجاح ✅`, 'success');
+  document.addEventListener('click', (e) => {
+    if (!inputFriend.contains(e.target) && !sugBox.contains(e.target)) {
+      sugBox.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('btnAddFriend').onclick = () => {
+    const target = inputFriend.value;
+    inputFriend.value = '';
+    sugBox.classList.add('hidden');
+    sendFriendRequest(target);
   };
 
   // Accept/Decline from top banner
@@ -537,7 +633,6 @@ window.addEventListener('DOMContentLoaded', () => {
     saveState();
     updateUI();
 
-    // Send to all friends or primary friend
     for (const friendName of state.friends) {
       await publishCloud(friendName, {
         type: 'HEART',
@@ -575,8 +670,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Manual Refresh Handler
-  document.getElementById('btnRefresh').onclick = triggerManualRefresh;
+  // Manual Refresh Button Handler
+  document.getElementById('btnRefresh').onclick = () => triggerManualRefresh(true);
 
   // Pull to Refresh Touch Events
   let touchStartY = 0;
@@ -597,7 +692,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('touchend', () => {
     if (touchDiffY > 75 && window.scrollY === 0) {
-      triggerManualRefresh();
+      triggerManualRefresh(false);
     } else {
       const indicator = document.getElementById('pullRefreshIndicator');
       if (indicator) indicator.classList.add('hidden');
@@ -610,6 +705,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       pollCloud();
+      pollDirectory();
     }
   });
 
@@ -619,18 +715,35 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Manual Refresh Engine
-async function triggerManualRefresh() {
+async function triggerManualRefresh(forceHardReload = false) {
   const btn = document.getElementById('btnRefresh');
   const indicator = document.getElementById('pullRefreshIndicator');
   if (btn) btn.classList.add('spinning');
   if (indicator) indicator.classList.remove('hidden');
 
+  if ('serviceWorker' in navigator) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (let r of registrations) {
+        await r.update();
+      }
+    } catch (e) {}
+  }
+
   await pollCloud();
+  await pollDirectory();
   updateUI();
 
   setTimeout(() => {
     if (btn) btn.classList.remove('spinning');
     if (indicator) indicator.classList.add('hidden');
     showFeedback('تم تحديث البيانات بنجاح 🔄', 'success');
-  }, 600);
+  }, 500);
+
+  // Force bypass cache if requested
+  if (forceHardReload && window.location.search.indexOf('v=') === -1) {
+    setTimeout(() => {
+      window.location.href = window.location.pathname + '?v=' + Date.now();
+    }, 600);
+  }
 }
