@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="icon" type="image/png" href="./icon-192.png">
 
-  <link rel="stylesheet" href="./style.css?v=8">
+  <link rel="stylesheet" href="./style.css?v=9">
 </head>
 <body>
 
@@ -31,6 +31,21 @@
   </svg>
 
   <div class="app-container">
+
+    <!-- NATIVE NOTIFICATION PROMPT MODAL (APPEARS ON FIRST LAUNCH / HOME SCREEN) -->
+    <div id="notifPromptModal" class="notif-prompt-modal hidden">
+      <div class="notif-modal-card">
+        <div class="notif-modal-icon">🔔</div>
+        <h2 class="notif-modal-title">تفعيل إشعارات ورنات منوشة</h2>
+        <p class="notif-modal-desc">
+          لتصلك نبضات وبوسات أصدقائك ويرن هاتفك حتى وشاشة الهاتف مقفلة، يرجى الضغط على الزر أدناه ثم اختيار <strong>"سماح" (Allow)</strong> في رسالة النظام الرسمية.
+        </p>
+        <button id="btnAllowNotifsModal" class="btn-modal-allow">
+          <span>السماح بجميع أنواع الإشعارات 🔔</span>
+        </button>
+        <button id="btnLaterNotifsModal" class="btn-modal-later">لاحقاً</button>
+      </div>
+    </div>
 
     <!-- Floating hearts & kisses container -->
     <div id="floatingContainer" class="floating-container"></div>
@@ -284,6 +299,6 @@
 
   </div>
 
-  <script src="./app.js?v=8"></script>
+  <script src="./app.js?v=9"></script>
 </body>
 </html>
