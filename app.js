@@ -1,8 +1,8 @@
 // منوشة 💜 - تطبيق النبضات البنفسجية والبوسات الفورية
-// الإصدار 8 - مع ميزة الضغط المطول (3 ثواني)، صوت البوسة، الإشعارات الفورية، وسجل البوسات
+// الإصدار 9 - تعريف جديد تماماً مع نافذة تفعيل إشعارات ورنات النظام الفورية
 
-const CLOUD_PREFIX = 'manousha_app_';
-const DIRECTORY_TOPIC = 'manousha_app_global_directory';
+const CLOUD_PREFIX = 'manousha_live_v9_';
+const DIRECTORY_TOPIC = 'manousha_directory_v9';
 
 // ==========================================
 // 1. Audio Engine & Kiss Sound Synthesis
@@ -357,7 +357,12 @@ async function publishCloud(targetUname, payload, notifTitle, notifText, tag) {
 
 // Trigger OS background notification via Service Worker or Web Notification
 function triggerNotification(title, body, tag) {
-  if (Notification.permission !== 'granted') return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+  // Update App Badge if supported (red badge counter on iPhone / Android icon)
+  if ('setAppBadge' in navigator) {
+    navigator.setAppBadge(state.received || 1).catch(() => {});
+  }
 
   // Try Service Worker registration first (works best when screen is locked)
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -367,6 +372,19 @@ function triggerNotification(title, body, tag) {
       body: body || 'نبضة قلب جديدة 💜',
       tag: tag || 'manousha-alert'
     });
+  } else if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.showNotification(title || 'منوشة 💜', {
+        body: body || 'نبضة قلب جديدة 💜',
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        vibrate: [300, 150, 300, 150, 500],
+        tag: tag || 'manousha-alert',
+        renotify: true,
+        requireInteraction: true,
+        data: { url: './manousha.html' }
+      });
+    }).catch(() => {});
   } else {
     try {
       new Notification(title, {
@@ -1104,18 +1122,62 @@ function switchTab(tabName) {
   }
 }
 
+function setupNotificationModal() {
+  const modal = document.getElementById('notifPromptModal');
+  const btnAllow = document.getElementById('btnAllowNotifsModal');
+  const btnLater = document.getElementById('btnLaterNotifsModal');
+  if (!modal || !btnAllow) return;
+
+  // Show modal if notification permission is not granted yet
+  if ('Notification' in window && Notification.permission === 'default') {
+    modal.classList.remove('hidden');
+  }
+
+  btnAllow.addEventListener('click', async () => {
+    sounds.init();
+    if (!('Notification' in window)) {
+      alert('المتصفح لا يدعم الإشعارات.');
+      modal.classList.add('hidden');
+      return;
+    }
+
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        modal.classList.add('hidden');
+        sounds.heartReceived();
+        showFeedback('تم تفعيل جميع أنواع الإشعارات بنجاح! 🔔💜', 'success');
+        triggerNotification('منوشة 💜', 'تم تفعيل جميع أنواع الإشعارات والرنات بنجاح! ستصلك تنبيهات النبضات والبوسات 🔔', 'welcome');
+        if ('setAppBadge' in navigator) navigator.setAppBadge(1).catch(() => {});
+      } else {
+        modal.classList.add('hidden');
+        alert('يرجى السماح بالإشعارات من إعدادات المتصفح.');
+      }
+    } catch (err) {
+      modal.classList.add('hidden');
+    }
+  });
+
+  btnLater?.addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+}
+
 // ==========================================
 // 10. Initialization & Event Listeners
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
   // Service Worker Registration
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=8').then((reg) => {
+    navigator.serviceWorker.register('./sw.js?v=9', { scope: './' }).then((reg) => {
       console.log('SW registered:', reg.scope);
     }).catch((err) => {
       console.log('SW registration failed:', err);
     });
   }
+
+  // Native Notification Permission Prompt Modal (For Home Screen / First Launch)
+  setupNotificationModal();
 
   // Registration Button
   document.getElementById('btnSaveUser')?.addEventListener('click', () => {
