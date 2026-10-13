@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>تطبيق القلب ❤️</title>
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#FF2D55">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="القلب">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="icon" type="image/png" href="./icon-192.png">
+
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <!-- SVG Gradient Definitions -->
+  <svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
+    <linearGradient id="heart-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF5B79" />
+      <stop offset="100%" stop-color="#FF2D55" />
+    </linearGradient>
+  </svg>
+
+  <div class="app-container">
+
+    <!-- Floating hearts animation container -->
+    <div id="floatingContainer" class="floating-container"></div>
+
+    <!-- Incoming heart notification overlay -->
+    <div id="receivedOverlay" class="received-overlay hidden">
+      <div class="received-heart-icon">❤️</div>
+      <div id="receivedSender" class="received-text">@user أرسل لك قلب</div>
+    </div>
+
+    <!-- PWA Install Banner -->
+    <div id="installBanner" class="install-banner hidden">
+      <div class="install-text">
+        <span>📲</span>
+        <span>ثبّت التطبيق على شاشة جوالك!</span>
+      </div>
+      <button id="btnInstallApp" class="btn-install">تثبيت الآن</button>
+    </div>
+
+    <!-- SCREEN 1: AUTH / WELCOME -->
+    <section id="screenAuth" class="screen auth-center hidden">
+      <div class="auth-logo">❤️</div>
+      <h1 class="auth-title">أرسل قلب لأحبابك</h1>
+      <p class="auth-subtitle">زر واحد بسيط لمشاركة النبض والمشاعر مع أصحابك في أي وقت</p>
+      <div style="flex:1"></div>
+      <button id="btnStartAuth" class="btn-primary" style="width:100%; max-width:320px; font-size:1.1rem; padding:16px;">
+        <span>يلا نبدأ</span>
+        <span>←</span>
+      </button>
+    </section>
+
+    <!-- SCREEN 2: CHOOSE USERNAME -->
+    <section id="screenUsername" class="screen auth-center hidden">
+      <div style="font-size:70px; color:var(--primary); margin-bottom:-6px;">❤️</div>
+      <h2 style="font-size:1.5rem; font-weight:800;">اختر اسم المستخدم</h2>
+      <p class="auth-subtitle">بيستخدمه أصحابك عشان يضيفونك ويرسلون لك</p>
+      
+      <div style="width:100%; max-width:320px; margin-top:20px;">
+        <input id="usernameInput" type="text" class="text-input" placeholder="مثلاً: fahad_99" style="text-align:center; font-size:1.1rem; font-weight:600; width:100%; margin-bottom:12px;" autocorrect="off" autocapitalize="none">
+        <div id="usernameError" class="status-msg error hidden" style="margin-bottom:12px;"></div>
+        <button id="btnClaimUsername" class="btn-primary" style="width:100%; font-size:1.05rem; padding:14px;">
+          دخول للتطبيق
+        </button>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: MAIN VIEW -->
+    <section id="screenMain" class="screen">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="user-badge">
+          <span style="color:var(--primary); font-size:1.2rem;">❤️</span>
+          <span id="headerUsername">@username</span>
+        </div>
+        <div class="header-actions">
+          <button id="btnOpenFriends" class="icon-btn" title="الأصدقاء والطلبات">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+            </svg>
+            <span id="requestsBadge" class="badge-count hidden">1</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Horizontal Friends Bar -->
+      <div class="friends-bar-wrapper">
+        <div id="friendsList" class="friends-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Giant Center Heart -->
+      <div class="heart-center-stage">
+        <button id="mainHeartBtn" class="heart-button" aria-label="أرسل قلب">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Dynamic Bottom Hint -->
+      <div id="hintFooter" class="hint-footer">
+        أضف صديق عشان تقدر ترسل له قلب
+      </div>
+    </section>
+
+    <!-- FRIENDS & REQUESTS MODAL (IOS SHEET) -->
+    <div id="friendsModalBackdrop" class="modal-backdrop">
+      <div class="sheet-container">
+        <div class="sheet-drag-handle"></div>
+        <div class="sheet-header">
+          <span class="sheet-title">الأصدقاء</span>
+          <button id="btnCloseFriends" class="sheet-close-btn">تم</button>
+        </div>
+
+        <div class="sheet-content">
+          <!-- Pending Requests Section -->
+          <div id="requestsSection" class="sheet-section hidden">
+            <span class="section-label">طلبات الصداقة الواردة</span>
+            <div id="requestsList"></div>
+          </div>
+
+          <!-- Add Friend Section -->
+          <div class="sheet-section">
+            <span class="section-label">أرسل طلب صداقة</span>
+            <div class="input-row">
+              <input id="addFriendInput" type="text" class="text-input" placeholder="اسم المستخدم" autocorrect="off" autocapitalize="none">
+              <button id="btnSendRequest" class="btn-primary">إرسال</button>
+            </div>
+            <div id="addFriendStatus" class="status-msg hidden"></div>
+          </div>
+
+          <!-- Share Username Section -->
+          <div class="sheet-section" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:0.8rem; color:var(--text-secondary);">يوزرك الحالي</div>
+              <div id="myHandleDisplay" style="font-weight:700; font-size:1.05rem;">@username</div>
+            </div>
+            <button id="btnShareHandle" class="btn-primary" style="padding:8px 16px; font-size:0.85rem;">
+              <span>مشاركة اليوزر</span>
+              <span>🔗</span>
+            </button>
+          </div>
+
+          <!-- Friends List Section -->
+          <div id="sheetFriendsSection" class="sheet-section">
+            <span class="section-label">أصحابك</span>
+            <div id="sheetFriendsList"></div>
+          </div>
+
+          <!-- Sign Out Section -->
+          <div class="sheet-section" style="padding:4px; background:transparent; box-shadow:none;">
+            <button id="btnSignOut" class="btn-danger">تسجيل خروج</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
