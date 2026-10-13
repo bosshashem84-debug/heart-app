@@ -151,6 +151,18 @@ function getCookie(name) {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
+// URL Reset Handler (?reset=1 or ?new=1 or ?clean=1)
+const initParams = new URLSearchParams(window.location.search);
+if (initParams.get('reset') === '1' || initParams.get('new') === '1' || initParams.get('clean') === '1') {
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+    setCookie('ha_uname', '');
+    setCookie('ha_friend', '');
+    setCookie('ha_friends_list', '');
+  } catch (e) {}
+}
+
 // ==========================================
 // 2. App State
 // ==========================================
@@ -168,12 +180,6 @@ const state = {
   pollTimer: null,
   recordedVoiceData: null
 };
-
-// Migrate single friend if stored in old format
-const oldSingleFriend = localStorage.getItem('ha_friend') || getCookie('ha_friend');
-if (oldSingleFriend && !state.friends.includes(oldSingleFriend)) {
-  state.friends.push(oldSingleFriend);
-}
 
 function saveState() {
   if (state.username) {
@@ -1200,12 +1206,28 @@ document.addEventListener('DOMContentLoaded', () => {
     sounds.init();
   });
 
-  // Top Header Actions
+  // Clear cache button on onboarding screen
+  document.getElementById('btnClearCacheBtn')?.addEventListener('click', () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      setCookie('ha_uname', '');
+      setCookie('ha_friend', '');
+    } catch (e) {}
+    alert('تم مسح جميع البيانات بنجاح! يمكنك الآن كتابة اسم جديد.');
+    window.location.href = window.location.pathname + '?reset=1';
+  });
+
+  // Top Header Actions: Reset / Logout
   document.getElementById('btnResetAccount')?.addEventListener('click', () => {
-    if (confirm('هل ترغب بتغيير اسم المستخدم المسجل؟')) {
-      state.username = null;
-      saveState();
-      updateUI();
+    if (confirm('هل ترغب بتسجيل الخروج ومسح بيانات الحساب للبدء من جديد؟')) {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        setCookie('ha_uname', '');
+        setCookie('ha_friend', '');
+      } catch (e) {}
+      window.location.href = window.location.pathname + '?reset=1';
     }
   });
 
@@ -1291,9 +1313,9 @@ document.addEventListener('DOMContentLoaded', () => {
     sendGiantKiss();
   });
 
-  // Share My Link Button
+  // Share My Link Button (Uses clean anonymous TinyURL without personal handles)
   document.getElementById('btnShareMyLink')?.addEventListener('click', async () => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}?add=${encodeURIComponent(state.username)}`;
+    const shareUrl = `https://tinyurl.com/manousha-heart-app?add=${encodeURIComponent(state.username)}`;
     const shareData = {
       title: 'منوشة 💜',
       text: `أضفني على تطبيق منوشة لنتبادل القلوب والبوسات الفورية! يوزري: @${state.username}`,
