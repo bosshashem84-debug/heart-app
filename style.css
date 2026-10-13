@@ -345,7 +345,60 @@ body {
   align-items: center;
   gap: 8px;
   box-shadow: var(--shadow-sm);
+  margin-bottom: 8px;
+}
+
+/* User Autocomplete Suggestions Box */
+.suggestions-box {
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  margin-top: -2px;
   margin-bottom: 12px;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 45, 85, 0.15);
+  animation: fadeInDown 0.2s ease;
+  z-index: 50;
+  position: relative;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:active {
+  background: #FFF0F2;
+}
+
+.suggestion-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-suggest-add {
+  background: #FFF0F2;
+  color: var(--primary);
+  border: 1px solid rgba(255, 45, 85, 0.3);
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .add-input {
