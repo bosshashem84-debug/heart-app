@@ -206,15 +206,17 @@ async function pollDirectory() {
 async function publishCloud(targetUname, payload) {
   const topic = getTopic(targetUname);
   try {
-    await fetch(`https://ntfy.sh/${topic}`, {
+    const res = await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Title': payload.type === 'HEART' ? '❤️ نبضة قلب جديدة' : '👋 طلب إضافة جديد'
+        'Content-Type': 'text/plain; charset=utf-8'
       },
       body: JSON.stringify(payload)
     });
-  } catch (err) {}
+    console.log('Published to', topic, res.status);
+  } catch (err) {
+    console.error('Publish cloud error:', err);
+  }
 }
 
 // Handling Events
@@ -225,18 +227,19 @@ function handleCloudMessage(data) {
   if (data.type === 'ADD_REQUEST') {
     const fromWho = data.from.toLowerCase();
     state.knownUsers.add(fromWho);
-    if (!state.friends.includes(fromWho) && !state.requests.includes(fromWho)) {
+    if (!state.requests.includes(fromWho)) {
       state.requests.push(fromWho);
-      saveState();
-      updateUI();
-      sounds.receive();
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    }
+    saveState();
+    updateUI();
+    sounds.receive();
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
-      showIncomingBanner(fromWho);
+    showIncomingBanner(fromWho);
 
-      if (Notification.permission === 'granted') {
-        new Notification('طلب إضافة جديد 👋', { body: `@${fromWho} يريد إضافتك في تطبيق القلب` });
-      }
+    if (Notification.permission === 'granted') {
+      new Notification('طلب إضافة جديد 👋', { body: `@${fromWho} يريد إضافتك في تطبيق القلب` });
+    }
     }
   } else if (data.type === 'ADD_ACCEPTED') {
     const fromWho = data.from.toLowerCase();
@@ -380,9 +383,6 @@ async function sendFriendRequest(target) {
     return;
   }
 
-  if (!state.friends.includes(cleanTarget)) {
-    state.friends.push(cleanTarget);
-  }
   state.knownUsers.add(cleanTarget);
   saveState();
   updateUI();
