@@ -62,50 +62,101 @@
         <button id="btnResetAccount" class="btn-text">تغيير الاسم</button>
       </header>
 
-      <!-- PROMINENT INCOMING REQUEST BANNER -->
-      <div id="incomingBanner" class="incoming-alert-banner hidden">
-        <div class="alert-info">
-          <span id="bannerTitle" class="alert-title">👋 طلب إضافة جديد</span>
-          <span id="bannerSub" class="alert-sub">@user يريد إضافتك</span>
-        </div>
-        <div class="alert-actions">
-          <button id="btnAcceptReq" class="btn-accept">قبول ✓</button>
-          <button id="btnDeclineReq" class="btn-decline">✕</button>
-        </div>
-      </div>
-
-      <!-- Add Friend Box (Directly on screen) -->
-      <div class="add-friend-box">
-        <input id="inputFriendName" type="text" class="add-input" placeholder="اكتب يوزر صديقك لإضافته" autocorrect="off" autocapitalize="none">
-        <button id="btnAddFriend" class="btn-add-action">إضافة +</button>
-      </div>
-      <div id="addFeedback" class="add-feedback hidden"></div>
-
-      <!-- Current Friend Pill -->
-      <div id="friendPill" class="active-friend-pill hidden">
-        <span>صديقك:</span>
-        <strong id="friendPillName">@friend</strong>
-        <span>❤️</span>
-      </div>
-
-      <!-- Stats Counters -->
-      <div class="stats-row">
-        <div class="stat-item">أرسلت: <span id="statSent">0</span></div>
-        <div class="stat-item">•</div>
-        <div class="stat-item">استلمت: <span id="statReceived">0</span></div>
-      </div>
-
-      <!-- Big Heart Button in center -->
-      <div class="heart-stage">
-        <button id="heartBtn" class="main-heart-btn" aria-label="أرسل قلب">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs">
+        <button id="tabHeart" class="tab-btn active">
+          <span>❤️</span>
+          <span>القلب</span>
         </button>
+        <button id="tabFriends" class="tab-btn">
+          <span>👥</span>
+          <span>الأصدقاء</span>
+          <span id="tabBadge" class="badge-dot hidden"></span>
+        </button>
+      </nav>
+
+      <!-- TAB 1: HEART SCREEN -->
+      <div id="viewHeart" style="flex:1; display:flex; flex-direction:column;">
+        <!-- PROMINENT INCOMING REQUEST BANNER -->
+        <div id="incomingBanner" class="incoming-alert-banner hidden">
+          <div class="alert-info">
+            <span id="bannerTitle" class="alert-title">👋 طلب إضافة جديد</span>
+            <span id="bannerSub" class="alert-sub">@user يريد إضافتك</span>
+          </div>
+          <div class="alert-actions">
+            <button id="btnAcceptReq" class="btn-accept">قبول ✓</button>
+            <button id="btnDeclineReq" class="btn-decline">✕</button>
+          </div>
+        </div>
+
+        <!-- Add Friend Box -->
+        <div class="add-friend-box">
+          <input id="inputFriendName" type="text" class="add-input" placeholder="اكتب يوزر صديقك لإضافته" autocorrect="off" autocapitalize="none">
+          <button id="btnAddFriend" class="btn-add-action">إضافة +</button>
+        </div>
+        <div id="addFeedback" class="add-feedback hidden"></div>
+
+        <!-- Current Friend Pill -->
+        <div id="friendPill" class="active-friend-pill hidden">
+          <span>صديقك:</span>
+          <strong id="friendPillName">@friend</strong>
+          <span>❤️</span>
+        </div>
+
+        <!-- Stats Counters -->
+        <div class="stats-row">
+          <div class="stat-item">أرسلت: <span id="statSent">0</span></div>
+          <div class="stat-item">•</div>
+          <div class="stat-item">استلمت: <span id="statReceived">0</span></div>
+        </div>
+
+        <!-- Big Heart Button in center -->
+        <div class="heart-stage">
+          <button id="heartBtn" class="main-heart-btn" aria-label="أرسل قلب">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div style="text-align:center; font-size:0.85rem; color:var(--text-secondary); padding-bottom:8px;">
+          اضغط القلب لإرسال نبضة فورية لصديقك
+        </div>
       </div>
 
-      <div style="text-align:center; font-size:0.85rem; color:var(--text-secondary); padding-bottom:8px;">
-        اضغط القلب لإرسال نبضة فورية لصديقك
+      <!-- TAB 2: FRIENDS LIST PAGE -->
+      <div id="viewFriends" class="friends-page hidden">
+        <!-- Incoming Requests Section -->
+        <div id="sectionRequests" class="section-card hidden">
+          <div class="section-heading">
+            <span>طلبات الإضافة الواردة</span>
+            <span style="color:#FF2D55">🔔</span>
+          </div>
+          <div id="requestsList"></div>
+        </div>
+
+        <!-- My Friends Section -->
+        <div class="section-card">
+          <div class="section-heading">
+            <span>الأصدقاء المضافون</span>
+            <span id="friendsCountBadge" style="background:#FFF0F2; color:#FF2D55; padding:2px 8px; border-radius:10px; font-size:0.8rem;">0</span>
+          </div>
+          <div id="friendsList"></div>
+          <div id="emptyFriendsMsg" class="empty-state">
+            لا يوجد أصدقاء مضافون بعد.<br>
+            اكتب يوزر صديقك في خانة الإضافة أو شارك رابطك معه!
+          </div>
+        </div>
+
+        <!-- Share My Link Section -->
+        <div class="section-card" style="text-align:center; padding:18px;">
+          <div style="font-size:0.9rem; font-weight:700; margin-bottom:4px;">يوزرك الحالي: <strong id="shareUnameText" style="color:#FF2D55">@user</strong></div>
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px;">أرسل الرابط لأصحابك على الواتساب ليضيفوك فوراً</p>
+          <button id="btnShareMyLink" class="btn-add-action" style="width:100%; padding:12px;">
+            <span>مشاركة الرابط واليوزر</span>
+            <span>🔗</span>
+          </button>
+        </div>
       </div>
 
     </section>
