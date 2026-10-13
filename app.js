@@ -575,6 +575,37 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Manual Refresh Handler
+  document.getElementById('btnRefresh').onclick = triggerManualRefresh;
+
+  // Pull to Refresh Touch Events
+  let touchStartY = 0;
+  let touchDiffY = 0;
+  window.addEventListener('touchstart', (e) => {
+    if (window.scrollY === 0) touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  window.addEventListener('touchmove', (e) => {
+    if (touchStartY > 0) {
+      touchDiffY = e.touches[0].clientY - touchStartY;
+      if (touchDiffY > 75 && window.scrollY === 0) {
+        const indicator = document.getElementById('pullRefreshIndicator');
+        if (indicator) indicator.classList.remove('hidden');
+      }
+    }
+  }, { passive: true });
+
+  window.addEventListener('touchend', () => {
+    if (touchDiffY > 75 && window.scrollY === 0) {
+      triggerManualRefresh();
+    } else {
+      const indicator = document.getElementById('pullRefreshIndicator');
+      if (indicator) indicator.classList.add('hidden');
+    }
+    touchStartY = 0;
+    touchDiffY = 0;
+  }, { passive: true });
+
   // Re-poll on visibility change
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -586,3 +617,20 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { Notification.requestPermission(); }, 2000);
   }
 });
+
+// Manual Refresh Engine
+async function triggerManualRefresh() {
+  const btn = document.getElementById('btnRefresh');
+  const indicator = document.getElementById('pullRefreshIndicator');
+  if (btn) btn.classList.add('spinning');
+  if (indicator) indicator.classList.remove('hidden');
+
+  await pollCloud();
+  updateUI();
+
+  setTimeout(() => {
+    if (btn) btn.classList.remove('spinning');
+    if (indicator) indicator.classList.add('hidden');
+    showFeedback('تم تحديث البيانات بنجاح 🔄', 'success');
+  }, 600);
+}
