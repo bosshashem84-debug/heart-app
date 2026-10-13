@@ -83,6 +83,66 @@ body {
   box-shadow: 0 0 8px #34C759;
 }
 
+/* Refresh Button */
+.icon-refresh-btn {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s, background 0.2s;
+}
+
+.icon-refresh-btn:active {
+  transform: scale(0.92);
+  background: #F2F2F7;
+}
+
+.icon-refresh-btn svg {
+  transition: transform 0.5s ease;
+}
+
+.icon-refresh-btn.spinning svg {
+  animation: rotateSpin 0.7s linear infinite;
+}
+
+@keyframes rotateSpin {
+  100% { transform: rotate(360deg); }
+}
+
+/* Pull to Refresh Indicator */
+.pull-refresh-indicator {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(28, 28, 30, 0.88);
+  backdrop-filter: blur(12px);
+  color: #FFF;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 999;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  animation: fadeInDown 0.25s ease;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
 /* Nav Tabs */
 .nav-tabs {
   display: flex;
