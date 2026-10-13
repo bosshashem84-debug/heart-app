@@ -240,7 +240,6 @@ function handleCloudMessage(data) {
     if (Notification.permission === 'granted') {
       new Notification('طلب إضافة جديد 👋', { body: `@${fromWho} يريد إضافتك في تطبيق القلب` });
     }
-    }
   } else if (data.type === 'ADD_ACCEPTED') {
     const fromWho = data.from.toLowerCase();
     state.knownUsers.add(fromWho);
