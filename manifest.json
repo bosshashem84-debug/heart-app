@@ -2,7 +2,7 @@
   "name": "منوشة 💜",
   "short_name": "منوشة",
   "description": "تطبيق منوشة لتبادل القلوب البنفسجية والبوسات بإشعار فوري",
-  "start_url": "./index.html",
+  "start_url": "./manousha.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#FAF7FF",
