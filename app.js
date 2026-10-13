@@ -1,4 +1,4 @@
-// تطبيق القلب ❤️ - النسخة المبسطة المباشرة (Simple & Persistent Cloud)
+// تطبيق القلب ❤️ - مع صفحة الأصدقاء وقائمة الإضافات
 
 const CLOUD_PREFIX = 'heartapp_v2_';
 
@@ -63,14 +63,21 @@ function getCookie(name) {
 // App State
 const state = {
   username: localStorage.getItem('ha_uname') || getCookie('ha_uname') || null,
-  friend: localStorage.getItem('ha_friend') || getCookie('ha_friend') || null,
+  friends: JSON.parse(localStorage.getItem('ha_friends_list') || '[]'),
+  requests: JSON.parse(localStorage.getItem('ha_reqs_list') || '[]'),
   sent: parseInt(localStorage.getItem('ha_sent') || '0', 10),
   received: parseInt(localStorage.getItem('ha_rcvd') || '0', 10),
-  pendingRequestFrom: null,
   processedIds: new Set(JSON.parse(localStorage.getItem('ha_msg_ids') || '[]')),
+  currentTab: 'heart', // 'heart' | 'friends'
   eventSource: null,
   pollTimer: null
 };
+
+// Migrate single friend if exists
+const oldSingleFriend = localStorage.getItem('ha_friend') || getCookie('ha_friend');
+if (oldSingleFriend && !state.friends.includes(oldSingleFriend)) {
+  state.friends.push(oldSingleFriend);
+}
 
 function saveState() {
   if (state.username) {
@@ -81,14 +88,8 @@ function saveState() {
     setCookie('ha_uname', '');
   }
 
-  if (state.friend) {
-    localStorage.setItem('ha_friend', state.friend);
-    setCookie('ha_friend', state.friend);
-  } else {
-    localStorage.removeItem('ha_friend');
-    setCookie('ha_friend', '');
-  }
-
+  localStorage.setItem('ha_friends_list', JSON.stringify(state.friends));
+  localStorage.setItem('ha_reqs_list', JSON.stringify(state.requests));
   localStorage.setItem('ha_sent', state.sent);
   localStorage.setItem('ha_rcvd', state.received);
 
@@ -178,24 +179,34 @@ function handleCloudMessage(data) {
   if (data.from && data.from.toLowerCase() === state.username.toLowerCase()) return;
 
   if (data.type === 'ADD_REQUEST') {
-    // Show prominent banner on screen
-    state.pendingRequestFrom = data.from;
-    showIncomingBanner(data.from);
-    sounds.receive();
-    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    const fromWho = data.from.toLowerCase();
+    // Check if not already in friends or requests
+    if (!state.friends.includes(fromWho) && !state.requests.includes(fromWho)) {
+      state.requests.push(fromWho);
+      saveState();
+      updateUI();
+      sounds.receive();
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
-    if (Notification.permission === 'granted') {
-      new Notification('طلب إضافة جديد 👋', { body: `@${data.from} يريد إضافتك في تطبيق القلب` });
+      // Show top banner on heart tab
+      showIncomingBanner(fromWho);
+
+      if (Notification.permission === 'granted') {
+        new Notification('طلب إضافة جديد 👋', { body: `@${fromWho} يريد إضافتك في تطبيق القلب` });
+      }
     }
   } else if (data.type === 'ADD_ACCEPTED') {
-    state.friend = data.from;
-    saveState();
-    updateUI();
-    sounds.receive();
-    showFeedback(`@${data.from} قبل طلبك! أصبحتم أصدقاء الآن 🎉`, 'success');
+    const fromWho = data.from.toLowerCase();
+    if (!state.friends.includes(fromWho)) {
+      state.friends.push(fromWho);
+      saveState();
+      updateUI();
+      sounds.receive();
+      showFeedback(`@${fromWho} قبل طلبك! أصبحتم أصدقاء الآن 🎉`, 'success');
 
-    if (Notification.permission === 'granted') {
-      new Notification('تم قبول الصداقة 🎉', { body: `@${data.from} قبل طلبك وأصبح صديقك الآن!` });
+      if (Notification.permission === 'granted') {
+        new Notification('تم قبول الصداقة 🎉', { body: `@${fromWho} قبل طلبك وأصبح صديقك الآن!` });
+      }
     }
   } else if (data.type === 'HEART') {
     state.received += 1;
@@ -218,7 +229,6 @@ function showIncomingBanner(fromName) {
 function hideIncomingBanner() {
   const banner = document.getElementById('incomingBanner');
   if (banner) banner.classList.add('hidden');
-  state.pendingRequestFrom = null;
 }
 
 function triggerHeartOverlay(fromName) {
@@ -260,6 +270,83 @@ function showFeedback(msg, type) {
   }
 }
 
+// Accept & Decline actions
+async function acceptUser(uname) {
+  const target = uname.toLowerCase();
+  state.requests = state.requests.filter(r => r !== target);
+  if (!state.friends.includes(target)) {
+    state.friends.push(target);
+  }
+  saveState();
+  updateUI();
+  hideIncomingBanner();
+
+  await publishCloud(target, {
+    type: 'ADD_ACCEPTED',
+    from: state.username,
+    target
+  });
+
+  showFeedback(`تم قبول @${target}! صرتوا أصدقاء الآن 🎉`, 'success');
+}
+
+function declineUser(uname) {
+  const target = uname.toLowerCase();
+  state.requests = state.requests.filter(r => r !== target);
+  saveState();
+  updateUI();
+  hideIncomingBanner();
+}
+
+function removeFriend(uname) {
+  if (confirm(`هل أنت متأكد من إزالة @${uname} من قائمة الأصدقاء؟`)) {
+    state.friends = state.friends.filter(f => f !== uname);
+    saveState();
+    updateUI();
+  }
+}
+
+async function sendHeartToUser(targetUname) {
+  sounds.send();
+  if (navigator.vibrate) navigator.vibrate(60);
+  spawnFloatingHeart();
+
+  state.sent += 1;
+  saveState();
+  updateUI();
+
+  await publishCloud(targetUname, {
+    type: 'HEART',
+    from: state.username,
+    target: targetUname,
+    timestamp: Date.now()
+  });
+
+  // Switch to heart tab
+  switchTab('heart');
+}
+
+// Switch Tabs
+function switchTab(tab) {
+  state.currentTab = tab;
+  const tabHeart = document.getElementById('tabHeart');
+  const tabFriends = document.getElementById('tabFriends');
+  const viewHeart = document.getElementById('viewHeart');
+  const viewFriends = document.getElementById('viewFriends');
+
+  if (tab === 'heart') {
+    tabHeart.classList.add('active');
+    tabFriends.classList.remove('active');
+    viewHeart.classList.remove('hidden');
+    viewFriends.classList.add('hidden');
+  } else {
+    tabHeart.classList.remove('active');
+    tabFriends.classList.add('active');
+    viewHeart.classList.add('hidden');
+    viewFriends.classList.remove('hidden');
+  }
+}
+
 // Main UI Update
 function updateUI() {
   const screenReg = document.getElementById('screenRegister');
@@ -275,32 +362,109 @@ function updateUI() {
   screenMain.classList.remove('hidden');
 
   document.getElementById('displayUsername').textContent = `@${state.username}`;
+  document.getElementById('shareUnameText').textContent = `@${state.username}`;
   document.getElementById('statSent').textContent = state.sent;
   document.getElementById('statReceived').textContent = state.received;
 
+  // Requests Badge Dot on tab
+  const tabBadge = document.getElementById('tabBadge');
+  if (state.requests.length > 0) {
+    tabBadge.classList.remove('hidden');
+  } else {
+    tabBadge.classList.add('hidden');
+  }
+
+  // Active friend pill on Heart tab
   const friendPill = document.getElementById('friendPill');
   const friendPillName = document.getElementById('friendPillName');
-  if (state.friend) {
-    friendPillName.textContent = `@${state.friend}`;
+  if (state.friends.length > 0) {
+    friendPillName.textContent = `@${state.friends[state.friends.length - 1]}`;
     friendPill.classList.remove('hidden');
   } else {
     friendPill.classList.add('hidden');
   }
+
+  renderFriendsPage();
 }
 
-// DOM Setup
+function renderFriendsPage() {
+  // 1. Pending Requests Section
+  const secReq = document.getElementById('sectionRequests');
+  const reqList = document.getElementById('requestsList');
+  if (state.requests.length === 0) {
+    secReq.classList.add('hidden');
+  } else {
+    secReq.classList.remove('hidden');
+    reqList.innerHTML = '';
+    state.requests.forEach(uname => {
+      const row = document.createElement('div');
+      row.className = 'friend-row';
+      row.innerHTML = `
+        <span class="friend-name">@${uname}</span>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-accept" style="padding:6px 14px; font-size:0.85rem;">قبول ✓</button>
+          <button class="btn-decline" style="padding:6px 10px; font-size:0.85rem;">✕</button>
+        </div>
+      `;
+      row.querySelector('.btn-accept').onclick = () => acceptUser(uname);
+      row.querySelector('.btn-decline').onclick = () => declineUser(uname);
+      reqList.appendChild(row);
+    });
+  }
+
+  // 2. Confirmed Friends Section
+  const friendsCountBadge = document.getElementById('friendsCountBadge');
+  const friendsList = document.getElementById('friendsList');
+  const emptyMsg = document.getElementById('emptyFriendsMsg');
+
+  friendsCountBadge.textContent = state.friends.length;
+
+  if (state.friends.length === 0) {
+    emptyMsg.classList.remove('hidden');
+    friendsList.innerHTML = '';
+  } else {
+    emptyMsg.classList.add('hidden');
+    friendsList.innerHTML = '';
+    state.friends.forEach(uname => {
+      const row = document.createElement('div');
+      row.className = 'friend-row';
+      row.innerHTML = `
+        <span class="friend-name">
+          <span style="color:#FF2D55">❤️</span>
+          <span>@${uname}</span>
+        </span>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn-send-mini">إرسال قلب ❤️</button>
+          <button class="btn-text" style="color:#FF3B30; font-size:0.75rem; padding:4px;">إزالة</button>
+        </div>
+      `;
+      row.querySelector('.btn-send-mini').onclick = () => sendHeartToUser(uname);
+      row.querySelector('.btn-text').onclick = () => removeFriend(uname);
+      friendsList.appendChild(row);
+    });
+  }
+}
+
+// Setup
 window.addEventListener('DOMContentLoaded', () => {
   updateUI();
   if (state.username) initCloud();
 
-  // Save Name (First-Time Only)
+  // Tab switching
+  document.getElementById('tabHeart').onclick = () => switchTab('heart');
+  document.getElementById('tabFriends').onclick = () => {
+    switchTab('friends');
+    pollCloud(); // refresh when opening friends page
+  };
+
+  // Register First-Time
   document.getElementById('btnSaveUser').onclick = () => {
     const raw = document.getElementById('regInput').value.trim();
     const clean = raw.toLowerCase().replace(/[^a-z0-9_]/g, '');
     const err = document.getElementById('regError');
 
     if (clean.length < 2) {
-      err.textContent = 'اكتب اسم إنجليزي أو حروف وأرقام واضحة';
+      err.textContent = 'اكتب اسم واضح بالحروف الإنجليزية أو الأرقام';
       err.classList.remove('hidden');
       return;
     }
@@ -312,7 +476,7 @@ window.addEventListener('DOMContentLoaded', () => {
     initCloud();
   };
 
-  // Add Friend
+  // Add Friend Input
   document.getElementById('btnAddFriend').onclick = async () => {
     const input = document.getElementById('inputFriendName');
     const target = input.value.trim().toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '');
@@ -326,13 +490,13 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Set as my current friend target
-    state.friend = target;
+    if (!state.friends.includes(target)) {
+      state.friends.push(target);
+    }
     saveState();
     updateUI();
     input.value = '';
 
-    // Send add notification to them
     await publishCloud(target, {
       type: 'ADD_REQUEST',
       from: state.username,
@@ -342,33 +506,25 @@ window.addEventListener('DOMContentLoaded', () => {
     showFeedback(`تم إرسال طلب إضافة لـ @${target} بنجاح ✅`, 'success');
   };
 
-  // Accept Incoming Request
-  document.getElementById('btnAcceptReq').onclick = async () => {
-    if (state.pendingRequestFrom) {
-      const fromWho = state.pendingRequestFrom;
-      state.friend = fromWho;
-      saveState();
-      updateUI();
+  // Accept/Decline from top banner
+  document.getElementById('btnAcceptReq').onclick = () => {
+    if (state.requests.length > 0) {
+      acceptUser(state.requests[state.requests.length - 1]);
+    } else {
       hideIncomingBanner();
-
-      await publishCloud(fromWho, {
-        type: 'ADD_ACCEPTED',
-        from: state.username,
-        target: fromWho
-      });
-
-      showFeedback(`تم قبول @${fromWho}! صرتوا أصدقاء الآن 🎉`, 'success');
+    }
+  };
+  document.getElementById('btnDeclineReq').onclick = () => {
+    if (state.requests.length > 0) {
+      declineUser(state.requests[state.requests.length - 1]);
+    } else {
+      hideIncomingBanner();
     }
   };
 
-  // Decline Incoming Request
-  document.getElementById('btnDeclineReq').onclick = () => {
-    hideIncomingBanner();
-  };
-
-  // Tap Heart Button
+  // Big Heart Button
   document.getElementById('heartBtn').onclick = async () => {
-    if (!state.friend) {
+    if (state.friends.length === 0) {
       showFeedback('اكتب اسم صديقك أولاً في الخانة بالأعلى 👆', 'error');
       return;
     }
@@ -381,12 +537,27 @@ window.addEventListener('DOMContentLoaded', () => {
     saveState();
     updateUI();
 
-    await publishCloud(state.friend, {
-      type: 'HEART',
-      from: state.username,
-      target: state.friend,
-      timestamp: Date.now()
-    });
+    // Send to all friends or primary friend
+    for (const friendName of state.friends) {
+      await publishCloud(friendName, {
+        type: 'HEART',
+        from: state.username,
+        target: friendName,
+        timestamp: Date.now()
+      });
+    }
+  };
+
+  // Share My Link
+  document.getElementById('btnShareMyLink').onclick = () => {
+    const url = window.location.href;
+    const txt = `ضيفني على تطبيق القلب ❤️ يوزري: @${state.username}\nرابط التطبيق: ${url}`;
+    if (navigator.share) {
+      navigator.share({ title: 'تطبيق القلب', text: txt }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(txt);
+      alert('تم نسخ الرابط واليوزر إلى الحافظة! أرسله لأصحابك.');
+    }
   };
 
   // Reset / Change Name
@@ -395,7 +566,8 @@ window.addEventListener('DOMContentLoaded', () => {
       if (state.eventSource) state.eventSource.close();
       if (state.pollTimer) clearInterval(state.pollTimer);
       state.username = null;
-      state.friend = null;
+      state.friends = [];
+      state.requests = [];
       state.sent = 0;
       state.received = 0;
       saveState();
@@ -410,7 +582,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Request notifications
   if ('Notification' in window && Notification.permission === 'default') {
     setTimeout(() => { Notification.requestPermission(); }, 2000);
   }
